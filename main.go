@@ -1,10 +1,11 @@
 package main
 
 import (
+	"os"
 	"time"
 	"weavory-backend/config"
 	"weavory-backend/routes"
-
+	"weavory-backend/utils"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -17,6 +18,8 @@ func main() {
 
 	r.Static("/uploads", "./uploads")
 
+	utils.InitCloudinary()
+	
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
@@ -27,5 +30,10 @@ func main() {
 
 	routes.SetupRoutes(r)
 
-	r.Run(":8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	r.Run(":" + port)
 }
