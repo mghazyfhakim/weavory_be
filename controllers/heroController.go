@@ -3,9 +3,11 @@ package controllers
 import (
 	"weavory-backend/config"
 	"weavory-backend/models"
-
+	"weavory-backend/utils"
 	"github.com/gin-gonic/gin"
 	"path/filepath"
+	"time"
+	"fmt"
 )
 
 func GetHero(c *gin.Context) {
@@ -23,14 +25,12 @@ func GetHero(c *gin.Context) {
 	)
 
 	if err != nil {
-		c.JSON(500, err.Error())
+		utils.Error(c, 500, err.Error())
 		return
 	}
 
-	c.JSON(200, hero)
+	utils.Success(c, hero)
 }
-
-
 
 func UpdateHero(c *gin.Context) {
 
@@ -43,21 +43,28 @@ func UpdateHero(c *gin.Context) {
 	var imagePath string
 
 	if file != nil {
-		filename := filepath.Base(file.Filename)
-		imagePath = filepath.Join("uploads", filename)
+		uploadPath := config.GetEnv("UPLOAD_PATH", "uploads")
+		filename := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(file.Filename))
+		imagePath = filepath.Join(uploadPath, filename)
 		c.SaveUploadedFile(file, imagePath)
 	}
 
-	query := "UPDATE hero SET title=$1, subtitle=$2, description=$3, image_url=$4 WHERE id=1"
+	query := "UPDATE about SET title=$1, subtitle=$2, description=$3"
+	args := []interface{}{title, subtitle, description}
 
-	args := []interface{}{title, subtitle, description, imagePath}
+	if imagePath != "" {
+	query += ", image_url=4 WHERE id=1"
+	args = append(args, imagePath)
+	} else {
+	query += " WHERE id=1"
+	}
 
 	_, err := config.DB.Exec(query, args...)
 
 	if err != nil {
-		c.JSON(500, err.Error())
+		utils.Error(c, 500, err.Error())
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "Hero updated"})
+	utils.Success(c, "Hero updated")
 }

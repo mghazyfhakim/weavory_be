@@ -10,19 +10,19 @@ func SetupRoutes(r *gin.Engine) {
 
 	api := r.Group("/api")
 	{
-		// services
 		api.GET("/services", controllers.GetServices)
 		api.POST("/services", controllers.CreateService)
 		api.PUT("/services/:id", controllers.UpdateService)
 		api.DELETE("/services/:id", controllers.DeleteService)
 
-		// portfolio
 		api.GET("/portfolios", controllers.GetPortfolios)
 		api.POST("/portfolios", controllers.CreatePortfolio)
 		api.PUT("/portfolios/:id", controllers.UpdatePortfolio)
 		api.DELETE("/portfolios/:id", controllers.DeletePortfolio)
+		api.GET("/portfolios/:id", controllers.GetPortfolioDetail)
 
-		// inquiry
+		api.GET("/materials", controllers.GetMaterials)
+
 		api.POST("/inquiry", controllers.CreateInquiry)
 
 		api.GET("/hero", controllers.GetHero)

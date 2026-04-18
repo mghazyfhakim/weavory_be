@@ -4,32 +4,38 @@ import (
 	"net/http"
 	"weavory-backend/config"
 	"weavory-backend/models"
-
+	"weavory-backend/utils"
 	"github.com/gin-gonic/gin"
 
 	"path/filepath"
+	"time"
+	"fmt"
 )
 
 func GetServices(c *gin.Context) {
 
 	rows, err := config.DB.Query("SELECT id,title,description,icon FROM services")
-
+	
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		utils.Error(c, 500, err.Error())
 		return
 	}
+	defer rows.Close()
 
 	var services []models.Service
 
 	for rows.Next() {
 		var s models.Service
 
-		rows.Scan(&s.ID, &s.Title, &s.Description, &s.Icon)
+		if err := rows.Scan(&s.ID, &s.Title, &s.Description, &s.Icon); err != nil {
+			utils.Error(c, 500, err.Error())
+			return
+		}
 
 		services = append(services, s)
 	}
 
-	c.JSON(http.StatusOK, services)
+	utils.Success(c, services)
 }
 
 func CreateService(c *gin.Context) {
@@ -39,12 +45,13 @@ func CreateService(c *gin.Context) {
 
 	file, err := c.FormFile("icon")
 	if err != nil {
-		c.JSON(400, gin.H{"error": "icon is required"})
+		utils.Error(c, 500, err.Error())
 		return
 	}
 
-	filename := filepath.Base(file.Filename)
-	filePath := filepath.Join("uploads", filename)
+	uploadPath := config.GetEnv("UPLOAD_PATH", "uploads")
+	filename := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(file.Filename))
+	filePath := filepath.Join(uploadPath, filename)
 
 	err = c.SaveUploadedFile(file, filePath)
 	if err != nil {
@@ -79,8 +86,9 @@ func UpdateService(c *gin.Context) {
 	var iconPath string
 
 	if file != nil {
-		filename := filepath.Base(file.Filename)
-		iconPath = filepath.Join("uploads", filename)
+		uploadPath := config.GetEnv("UPLOAD_PATH", "uploads")
+		filename := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(file.Filename))
+		iconPath = filepath.Join(uploadPath, filename)
 		c.SaveUploadedFile(file, iconPath)
 	}
 
