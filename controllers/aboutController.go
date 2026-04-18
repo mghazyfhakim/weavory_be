@@ -1,58 +1,128 @@
 package controllers
 
 import (
+	"encoding/json"
 	"weavory-backend/config"
 	"weavory-backend/models"
-
+	"weavory-backend/utils"
 	"github.com/gin-gonic/gin"
 	"path/filepath"
+	"fmt"
+	
 )
 
 func GetAbout(c *gin.Context) {
 
 	var about models.About
+	var missionStr string
 
-	err := config.DB.QueryRow(
-		"SELECT id,title,description,image_url FROM about LIMIT 1",
-	).Scan(
+	err := config.DB.QueryRow(`
+		SELECT id,title,description,image_url,profile,vision,mission 
+		FROM about LIMIT 1
+	`).Scan(
 		&about.ID,
 		&about.Title,
 		&about.Description,
 		&about.ImageURL,
+		&about.Profile,
+		&about.Vision,
+		&missionStr,
 	)
 
 	if err != nil {
-		c.JSON(500, err.Error())
+		utils.Error(c, 500, err.Error())
 		return
 	}
 
-	c.JSON(200, about)
+	if missionStr != "" {
+		json.Unmarshal([]byte(missionStr), &about.Mission)
+	}
+
+	utils.Success(c, about)
 }
 
 func UpdateAbout(c *gin.Context) {
 
+	var (
+		query = "UPDATE about SET "
+		args  []interface{}
+		index = 1
+	)
+
 	title := c.PostForm("title")
 	description := c.PostForm("description")
+	profile := c.PostForm("profile")
+	vision := c.PostForm("vision")
+	missionStr := c.PostForm("mission")
 
-	file, _ := c.FormFile("image_url")
-
-	var imagePath string
-
-	if file != nil {
-		filename := filepath.Base(file.Filename)
-		imagePath = filepath.Join("uploads", filename)
-		c.SaveUploadedFile(file, imagePath)
+	if title != "" {
+		query += fmt.Sprintf("title=$%d,", index)
+		args = append(args, title)
+		index++
 	}
 
-	query := "UPDATE about SET title=$1, description=$2, image_url=$3 WHERE id=1"
-	args := []interface{}{title, description, imagePath}
+	if description != "" {
+		query += fmt.Sprintf("description=$%d,", index)
+		args = append(args, description)
+		index++
+	}
 
-	_, err := config.DB.Exec(query, args...)
+	if profile != "" {
+		query += fmt.Sprintf("profile=$%d,", index)
+		args = append(args, profile)
+		index++
+	}
 
-	if err != nil {
-		c.JSON(500, err.Error())
+	if vision != "" {
+		query += fmt.Sprintf("vision=$%d,", index)
+		args = append(args, vision)
+		index++
+	}
+
+	if missionStr != "" {
+		var missions []string
+
+		err := json.Unmarshal([]byte(missionStr), &missions)
+		if err != nil {
+			utils.Error(c, 400, "invalid mission format")
+			return
+		}
+
+		missionJSON, _ := json.Marshal(missions)
+
+		query += fmt.Sprintf("mission=$%d,", index)
+		args = append(args, string(missionJSON))
+		index++
+	}
+
+	file, _ := c.FormFile("image_url")
+	if file != nil {
+		uploadPath := config.GetEnv("UPLOAD_PATH", "uploads")
+		filename := filepath.Base(file.Filename)
+		imagePath := filepath.Join(uploadPath, filename)
+
+		if err := c.SaveUploadedFile(file, imagePath); err == nil {
+			query += fmt.Sprintf("image_url=$%d,", index)
+			args = append(args, imagePath)
+			index++
+		}
+	}
+
+	if len(args) == 0 {
+		utils.Error(c, 400, "no data to update")
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "About updated"})
+	query = query[:len(query)-1]
+
+	query += fmt.Sprintf(" WHERE id=$%d", index)
+	args = append(args, 1)
+
+	_, err := config.DB.Exec(query, args...)
+	if err != nil {
+		utils.Error(c, 500, err.Error())
+		return
+	}
+
+	utils.Success(c, "About updated")
 }

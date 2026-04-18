@@ -1,8 +1,12 @@
 package models
 
 type About struct {
-	ID          int    `json:"id"`
-	Title       string `json:"title" form:"title"`
-	Description string `json:"description" form:"description"`
-	ImageURL    string `json:"image_url" form:"image_url"`
-}
+	ID          int      `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	ImageURL    string   `json:"image_url"`
+
+	Profile     string   `json:"profile"`
+	Vision      string   `json:"vision"`
+	Mission     []string `json:"mission"`
+}	
