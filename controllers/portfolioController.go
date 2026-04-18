@@ -1,105 +1,251 @@
 package controllers
 
 import (
-	"net/http"
-	"weavory-backend/config"
-	"weavory-backend/models"
-
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"path/filepath"
+	"time"
+	"weavory-backend/config"
+	"weavory-backend/models"
+	"weavory-backend/utils"
 )
 
 func GetPortfolios(c *gin.Context) {
 
-	rows, err := config.DB.Query("SELECT id,title,description,image_url FROM portfolios")
+	limit := c.Query("limit")
 
+	query := "SELECT id,title,description,image_url,material FROM portfolios ORDER BY id DESC"
+
+	if limit != "" {
+		var limitVal int
+		fmt.Sscanf(limit, "%d", &limitVal)
+
+		if limitVal > 0 {
+			query += fmt.Sprintf(" LIMIT %d", limitVal)
+		}
+	}
+
+	rows, err := config.DB.Query(query)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		utils.Error(c, 500, err.Error())
 		return
 	}
+	defer rows.Close()
 
 	var portfolios []models.Portfolio
 
 	for rows.Next() {
 		var s models.Portfolio
 
-		rows.Scan(&s.ID, &s.Title, &s.Description, &s.ImageURL)
+		if err := rows.Scan(&s.ID, &s.Title, &s.Description, &s.ImageURL, &s.Material); err != nil {
+			utils.Error(c, 500, err.Error())
+			return
+		}
 
 		portfolios = append(portfolios, s)
 	}
 
-	c.JSON(http.StatusOK, portfolios)
+	utils.Success(c, portfolios)
+}
+
+func GetPortfolioDetail(c *gin.Context) {
+	id := c.Param("id")
+
+	var p models.Portfolio
+
+	err := config.DB.QueryRow(`
+		SELECT id, title, description, material, teknik_jahit, finishing, layanan, image_url
+		FROM portfolios WHERE id=$1
+	`, id).Scan(
+		&p.ID,
+		&p.Title,
+		&p.Description,
+		&p.Material,
+		&p.TeknikJahit,
+		&p.Finishing,
+		&p.Layanan,
+		&p.ImageURL,
+	)
+
+	if err != nil {
+		utils.Error(c, 404, "Portfolio not found")
+		return
+	}
+
+	rows, err := config.DB.Query(`
+		SELECT image_url FROM portfolio_images WHERE portfolio_id=$1
+	`, id)
+
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var img string
+			rows.Scan(&img)
+			p.Images = append(p.Images, img)
+		}
+	}
+
+	utils.Success(c, p)
 }
 
 func CreatePortfolio(c *gin.Context) {
 	title := c.PostForm("title")
-	description := c.PostForm("description")
+	material := c.PostForm("material")
+	TeknikJahit := c.PostForm("TeknikJahit")
+	finishing := c.PostForm("finishing")
+	layanan := c.PostForm("layanan")
 
-	file, err := c.FormFile("image_url")
-	if err != nil {
-		c.JSON(400, gin.H{"error": "image_url is required"})
+	if title == "" || material == "" || TeknikJahit == "" || finishing == "" {
+		utils.Error(c, 400, "all fields are required")
 		return
 	}
 
-	filename := filepath.Base(file.Filename)
-	filePath := filepath.Join("uploads", filename)
+	description := fmt.Sprintf("%s | %s", TeknikJahit, finishing)
 
-	err = c.SaveUploadedFile(file, filePath)
+	// 🔥 THUMBNAIL (Cloudinary)
+	thumb, err := c.FormFile("thumbnail")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, err.Error())
+		utils.Error(c, 400, "thumbnail is required")
 		return
 	}
 
-	_, err = config.DB.Exec(
-		"INSERT INTO portfolios (title, description, image_url) VALUES ($1,$2,$3)",
-		title, description, filePath,
-	)
-
+	thumbURL, err := utils.UploadImage(thumb)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, err.Error())
+		utils.Error(c, 500, "failed upload thumbnail")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Portfolios created",
-		"image_url":    filePath,
+	var portfolioID int
+	err = config.DB.QueryRow(`
+		INSERT INTO portfolios 
+		(title, description, image_url, material, teknik_jahit, finishing, layanan)
+		VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id
+	`, title, description, thumbURL, material, TeknikJahit, finishing, layanan).Scan(&portfolioID)
+
+	if err != nil {
+		utils.Error(c, 500, err.Error())
+		return
+	}
+
+	// 🔥 MULTIPLE IMAGES
+	form, _ := c.MultipartForm()
+	files := form.File["images"]
+
+	for _, file := range files {
+
+		imageURL, err := utils.UploadImage(file)
+		if err != nil {
+			continue
+		}
+
+		config.DB.Exec(`
+			INSERT INTO portfolio_images (portfolio_id, image_url)
+			VALUES ($1,$2)
+		`, portfolioID, imageURL)
+	}
+
+	utils.Success(c, gin.H{
+		"id":      portfolioID,
+		"message": "Portfolio created with Cloudinary",
 	})
 }
 
 func UpdatePortfolio(c *gin.Context) {
 	id := c.Param("id")
 
-	title := c.PostForm("title")
-	description := c.PostForm("description")
+	var existing models.Portfolio
 
-	file, _ := c.FormFile("image_url")
+	err := config.DB.QueryRow(`
+		SELECT title, material, teknik_jahit, finishing, layanan, image_url
+		FROM portfolios WHERE id=$1
+	`, id).Scan(
+		&existing.Title,
+		&existing.Material,
+		&existing.TeknikJahit,
+		&existing.Finishing,
+		&existing.Layanan,
+		&existing.ImageURL,
+	)
 
-	var imagePath string
-
-	if file != nil {
-		filename := filepath.Base(file.Filename)
-		imagePath = filepath.Join("uploads", filename)
-		c.SaveUploadedFile(file, imagePath)
-	}
-
-	query := "UPDATE portfolios SET title=$1, description=$2"
-	args := []interface{}{title, description}
-
-	if imagePath != "" {
-		query += ", image_url=$3 WHERE id=$4"
-		args = append(args, imagePath, id)
-	} else {
-		query += " WHERE id=$3"
-		args = append(args, id)
-	}
-
-	_, err := config.DB.Exec(query, args...)
 	if err != nil {
-		c.JSON(500, err.Error())
+		utils.Error(c, 404, "Portfolio not found")
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "Updated"})
+	title := c.PostForm("title")
+	material := c.PostForm("material")
+	teknikJahit := c.PostForm("TeknikJahit")
+	finishing := c.PostForm("finishing")
+	layanan := c.PostForm("layanan")
+
+	if title == "" {
+		title = existing.Title
+	}
+	if material == "" {
+		material = existing.Material
+	}
+	if teknikJahit == "" {
+		teknikJahit = existing.TeknikJahit
+	}
+	if finishing == "" {
+		finishing = existing.Finishing
+	}
+	if layanan == "" {
+		layanan = existing.Layanan
+	}
+
+	description := fmt.Sprintf("%s | %s", teknikJahit, finishing)
+
+	thumb, _ := c.FormFile("thumbnail")
+	thumbPath := existing.ImageURL
+
+	if thumb != nil {
+		uploadPath := config.GetEnv("UPLOAD_PATH", "uploads")
+		filename := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(thumb.Filename))
+		thumbPath = filepath.Join(uploadPath, filename)
+
+		if err := c.SaveUploadedFile(thumb, thumbPath); err != nil {
+			utils.Error(c, 500, "failed to save thumbnail")
+			return
+		}
+	}
+
+	_, err = config.DB.Exec(`
+		UPDATE portfolios 
+		SET title=$1, description=$2, image_url=$3, material=$4, teknik_jahit=$5, finishing=$6, layanan=$7
+		WHERE id=$8
+	`, title, description, thumbPath, material, teknikJahit, finishing, layanan, id)
+
+	if err != nil {
+		utils.Error(c, 500, err.Error())
+		return
+	}
+
+	form, _ := c.MultipartForm()
+	files := form.File["images"]
+
+	if len(files) > 0 {
+		config.DB.Exec("DELETE FROM portfolio_images WHERE portfolio_id=$1", id)
+
+		for _, file := range files {
+			uploadPath := config.GetEnv("UPLOAD_PATH", "uploads")
+			filename := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(file.Filename))
+			filePath := filepath.Join(uploadPath, filename)
+
+			if err := c.SaveUploadedFile(file, filePath); err != nil {
+				continue
+			}
+
+			config.DB.Exec(`
+				INSERT INTO portfolio_images (portfolio_id, image_url)
+				VALUES ($1,$2)
+			`, id, filePath)
+		}
+	}
+
+	utils.Success(c, gin.H{
+		"message": "Portfolio updated",
+	})
 }
 
 func DeletePortfolio(c *gin.Context) {
@@ -107,5 +253,5 @@ func DeletePortfolio(c *gin.Context) {
 
 	config.DB.Exec("DELETE FROM portfolios WHERE id=$1", id)
 
-	c.JSON(200, gin.H{"message": "Deleted"})
+	utils.Success(c, "data deleted")
 }
