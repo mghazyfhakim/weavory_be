@@ -4,7 +4,6 @@ import (
 	"mime/multipart"
 )
 
-// Wrapper biar gampang dipakai di controller
 func UploadImage(fileHeader *multipart.FileHeader) (string, error) {
 	file, err := fileHeader.Open()
 	if err != nil {
