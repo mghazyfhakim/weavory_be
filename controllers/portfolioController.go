@@ -3,8 +3,6 @@ package controllers
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"path/filepath"
-	"time"
 	"weavory-backend/config"
 	"weavory-backend/models"
 	"weavory-backend/utils"
@@ -197,24 +195,22 @@ func UpdatePortfolio(c *gin.Context) {
 	description := fmt.Sprintf("%s | %s", teknikJahit, finishing)
 
 	thumb, _ := c.FormFile("thumbnail")
-	thumbPath := existing.ImageURL
+	thumbURL := existing.ImageURL
 
 	if thumb != nil {
-		uploadPath := config.GetEnv("UPLOAD_PATH", "uploads")
-		filename := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(thumb.Filename))
-		thumbPath = filepath.Join(uploadPath, filename)
-
-		if err := c.SaveUploadedFile(thumb, thumbPath); err != nil {
-			utils.Error(c, 500, "failed to save thumbnail")
+		url, err := utils.UploadImage(thumb)
+		if err != nil {
+			utils.Error(c, 500, "failed upload thumbnail")
 			return
 		}
+		thumbURL = url
 	}
 
 	_, err = config.DB.Exec(`
 		UPDATE portfolios 
 		SET title=$1, description=$2, image_url=$3, material=$4, teknik_jahit=$5, finishing=$6, layanan=$7
 		WHERE id=$8
-	`, title, description, thumbPath, material, teknikJahit, finishing, layanan, id)
+	`, title, description, thumbURL, material, teknikJahit, finishing, layanan, id)
 
 	if err != nil {
 		utils.Error(c, 500, err.Error())
@@ -228,23 +224,20 @@ func UpdatePortfolio(c *gin.Context) {
 		config.DB.Exec("DELETE FROM portfolio_images WHERE portfolio_id=$1", id)
 
 		for _, file := range files {
-			uploadPath := config.GetEnv("UPLOAD_PATH", "uploads")
-			filename := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(file.Filename))
-			filePath := filepath.Join(uploadPath, filename)
-
-			if err := c.SaveUploadedFile(file, filePath); err != nil {
+			url, err := utils.UploadImage(file)
+			if err != nil {
 				continue
 			}
 
 			config.DB.Exec(`
 				INSERT INTO portfolio_images (portfolio_id, image_url)
 				VALUES ($1,$2)
-			`, id, filePath)
+			`, id, url)
 		}
 	}
 
 	utils.Success(c, gin.H{
-		"message": "Portfolio updated",
+		"message": "Portfolio updated (Cloudinary)",
 	})
 }
 

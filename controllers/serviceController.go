@@ -1,15 +1,10 @@
 package controllers
 
 import (
-	"net/http"
 	"weavory-backend/config"
 	"weavory-backend/models"
 	"weavory-backend/utils"
 	"github.com/gin-gonic/gin"
-
-	"path/filepath"
-	"time"
-	"fmt"
 )
 
 func GetServices(c *gin.Context) {
@@ -45,71 +40,80 @@ func CreateService(c *gin.Context) {
 
 	file, err := c.FormFile("icon")
 	if err != nil {
-		utils.Error(c, 500, err.Error())
+		utils.Error(c, 400, "icon is required")
 		return
 	}
 
-	uploadPath := config.GetEnv("UPLOAD_PATH", "uploads")
-	filename := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(file.Filename))
-	filePath := filepath.Join(uploadPath, filename)
-
-	err = c.SaveUploadedFile(file, filePath)
+	// 🔥 CLOUDINARY
+	iconURL, err := utils.UploadImage(file)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, err.Error())
+		utils.Error(c, 500, "failed upload icon")
 		return
 	}
 
 	_, err = config.DB.Exec(
 		"INSERT INTO services (title, description, icon) VALUES ($1,$2,$3)",
-		title, description, filePath,
+		title, description, iconURL,
 	)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, err.Error())
+		utils.Error(c, 500, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Service created",
-		"icon":    filePath,
-	})
+	utils.Success(c, "Service created")
 }
 
 func UpdateService(c *gin.Context) {
 	id := c.Param("id")
 
-	title := c.PostForm("title")
-	description := c.PostForm("description")
+	var existing models.Service
 
-	file, _ := c.FormFile("icon")
+	err := config.DB.QueryRow(`
+		SELECT title, description, icon FROM services WHERE id=$1
+	`, id).Scan(
+		&existing.Title,
+		&existing.Description,
+		&existing.Icon,
+	)
 
-	var iconPath string
-
-	if file != nil {
-		uploadPath := config.GetEnv("UPLOAD_PATH", "uploads")
-		filename := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(file.Filename))
-		iconPath = filepath.Join(uploadPath, filename)
-		c.SaveUploadedFile(file, iconPath)
-	}
-
-	query := "UPDATE services SET title=$1, description=$2"
-	args := []interface{}{title, description}
-
-	if iconPath != "" {
-		query += ", icon=$3 WHERE id=$4"
-		args = append(args, iconPath, id)
-	} else {
-		query += " WHERE id=$3"
-		args = append(args, id)
-	}
-
-	_, err := config.DB.Exec(query, args...)
 	if err != nil {
-		c.JSON(500, err.Error())
+		utils.Error(c, 404, "Service not found")
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "Updated"})
+	title := c.PostForm("title")
+	description := c.PostForm("description")
+
+	if title == "" {
+		title = existing.Title
+	}
+	if description == "" {
+		description = existing.Description
+	}
+
+	icon := existing.Icon
+
+	file, _ := c.FormFile("icon")
+	if file != nil {
+		url, err := utils.UploadImage(file)
+		if err == nil {
+			icon = url
+		}
+	}
+
+	_, err = config.DB.Exec(`
+		UPDATE services 
+		SET title=$1, description=$2, icon=$3 
+		WHERE id=$4
+	`, title, description, icon, id)
+
+	if err != nil {
+		utils.Error(c, 500, err.Error())
+		return
+	}
+
+	utils.Success(c, "Service updated")
 }
 
 func DeleteService(c *gin.Context) {
