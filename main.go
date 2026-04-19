@@ -11,7 +11,8 @@ import (
 )
 
 func main() {
-
+	utils.InitCloudinary()
+	
 	config.ConnectDB()
 
 	r := gin.Default()
@@ -19,8 +20,6 @@ func main() {
 	r.Static("/uploads", "./uploads")
 
 	r.Use(cors.Default())
-
-	utils.InitCloudinary()
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
