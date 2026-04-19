@@ -6,7 +6,6 @@ import (
 	"weavory-backend/models"
 	"weavory-backend/utils"
 	"github.com/gin-gonic/gin"
-	"path/filepath"
 	"fmt"
 	
 )
@@ -97,13 +96,10 @@ func UpdateAbout(c *gin.Context) {
 
 	file, _ := c.FormFile("image_url")
 	if file != nil {
-		uploadPath := config.GetEnv("UPLOAD_PATH", "uploads")
-		filename := filepath.Base(file.Filename)
-		imagePath := filepath.Join(uploadPath, filename)
-
-		if err := c.SaveUploadedFile(file, imagePath); err == nil {
+		url, err := utils.UploadImage(file)
+		if err == nil {
 			query += fmt.Sprintf("image_url=$%d,", index)
-			args = append(args, imagePath)
+			args = append(args, url)
 			index++
 		}
 	}
@@ -114,7 +110,6 @@ func UpdateAbout(c *gin.Context) {
 	}
 
 	query = query[:len(query)-1]
-
 	query += fmt.Sprintf(" WHERE id=$%d", index)
 	args = append(args, 1)
 
