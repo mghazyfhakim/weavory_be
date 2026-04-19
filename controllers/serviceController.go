@@ -44,10 +44,9 @@ func CreateService(c *gin.Context) {
 		return
 	}
 
-	// 🔥 CLOUDINARY
 	iconURL, err := utils.UploadImage(file)
 	if err != nil {
-		utils.Error(c, 500, "failed upload icon")
+		utils.Error(c, 500, err.Error())
 		return
 	}
 
@@ -94,12 +93,14 @@ func UpdateService(c *gin.Context) {
 
 	icon := existing.Icon
 
-	file, _ := c.FormFile("icon")
-	if file != nil {
+	file, err := c.FormFile("icon")
+	if err == nil {
 		url, err := utils.UploadImage(file)
-		if err == nil {
-			icon = url
+		if err != nil {
+			utils.Error(c, 500, err.Error())
+			return
 		}
+		icon = url
 	}
 
 	_, err = config.DB.Exec(`
