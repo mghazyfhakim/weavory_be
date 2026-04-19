@@ -40,11 +40,10 @@ func CreateService(c *gin.Context) {
 
 	file, err := c.FormFile("icon")
 	if err != nil {
-		utils.Error(c, 400, "icon is required")
+		utils.Error(c, 500, err.Error())
 		return
 	}
 
-	// 🔥 CLOUDINARY
 	iconURL, err := utils.UploadImage(file)
 	if err != nil {
 		utils.Error(c, 500, "failed upload icon")
