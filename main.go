@@ -12,7 +12,7 @@ import (
 
 func main() {
 	utils.InitCloudinary()
-	
+
 	config.ConnectDB()
 
 	r := gin.Default()
@@ -23,8 +23,8 @@ func main() {
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
-			"http://localhost:3000",
-			"https://weavory-fe.vercel.app",
+			"https://weavorystudio.com",
+			"https://www.weavorystudio.com",
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
