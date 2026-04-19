@@ -18,6 +18,8 @@ func main() {
 
 	r.Static("/uploads", "./uploads")
 
+	r.Use(cors.Default())
+
 	utils.InitCloudinary()
 	
 	r.Use(cors.New(cors.Config{
