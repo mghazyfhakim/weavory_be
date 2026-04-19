@@ -2,7 +2,6 @@ package config
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
 
@@ -14,34 +13,52 @@ var DB *sql.DB
 
 func ConnectDB() {
 
-	// load .env
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("No .env file found")
+		log.Println("No .env file found (production mode)")
 	}
 
-	// ambil dari env
-	host := os.Getenv("DB_HOST")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASSWORD")
-	dbname := os.Getenv("DB_NAME")
-	port := os.Getenv("DB_PORT")
+	dbURL := os.Getenv("DATABASE_URL")
 
-	connStr := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		host, user, password, dbname, port,
-	)
+	var db *sql.DB
 
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		log.Fatal(err)
+	if dbURL != "" {
+		log.Println("Using DATABASE_URL (production)")
+
+		var err error
+		db, err = sql.Open("postgres", dbURL)
+		if err != nil {
+			log.Fatal("Failed to open DB:", err)
+		}
+
+	} else {
+		log.Println("Using DB config (local)")
+
+		host := os.Getenv("DB_HOST")
+		user := os.Getenv("DB_USER")
+		password := os.Getenv("DB_PASSWORD")
+		dbname := os.Getenv("DB_NAME")
+		port := os.Getenv("DB_PORT")
+
+		connStr := "host=" + host +
+			" user=" + user +
+			" password=" + password +
+			" dbname=" + dbname +
+			" port=" + port +
+			" sslmode=disable"
+
+		var err error
+		db, err = sql.Open("postgres", connStr)
+		if err != nil {
+			log.Fatal("Failed to open DB:", err)
+		}
 	}
 
 	if err := db.Ping(); err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to connect DB:", err)
 	}
 
-	fmt.Println("✅ Database Connected")
+	log.Println("✅ Database Connected")
 
 	DB = db
 }
