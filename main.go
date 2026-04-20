@@ -26,6 +26,7 @@ func main() {
 			"https://weavorystudio.com",
 			"https://www.weavorystudio.com",
 			"http://localhost:3000",
+
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
