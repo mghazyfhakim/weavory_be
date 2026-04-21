@@ -46,7 +46,6 @@ func CreateInquiry(c *gin.Context) {
 
 	client := resend.NewClient(apiKey)
 
-	// ================= ADMIN EMAIL =================
 	adminHTML := `
 <!DOCTYPE html>
 <html>
@@ -101,12 +100,11 @@ Balas Email
 		println("Admin email sent:", resAdmin.Id)
 	}
 
-	// ================= USER EMAIL =================
 	userHTML := `
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#000000;">
-<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#000000">
+<body style="margin:0;padding:0;background:#102F76;">
+<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#102F76">
 <tr>
 <td align="center">
 
@@ -114,13 +112,13 @@ Balas Email
 
 <!-- HEADER -->
 <tr>
-<td align="center" bgcolor="#0f0f0f" style="padding:25px;">
+<td align="center" bgcolor="#102F76" style="padding:25px;">
 <img 
 src="https://res.cloudinary.com/dphlgt5hf/image/upload/f_auto,q_auto,w_200/Design_2-removebg-preview_np1r2i.png" 
 width="120"
 style="display:block;margin:0 auto;" 
 />
-<p style="color:#c9a96e;font-size:12px;margin-top:10px;">
+<p style="color:#477D7B;font-size:12px;margin-top:10px;letter-spacing:1px;">
 PREMIUM TAILOR & FASHION STUDIO
 </p>
 </td>
@@ -130,7 +128,7 @@ PREMIUM TAILOR & FASHION STUDIO
 <tr>
 <td style="padding:30px;">
 
-<h2 style="margin:0;color:#111;">
+<h2 style="margin:0;color:#102F76;">
 Terima kasih, ` + inquiry.Name + `
 </h2>
 
@@ -155,7 +153,7 @@ Tim kami akan segera menghubungi Anda.
 
 <div style="text-align:center;margin-top:25px;">
 <a href="https://weavorystudio.com"
-style="background:#c9a96e;color:#000;padding:12px 20px;text-decoration:none;">
+style="background:#477D7B;color:#ffffff;padding:12px 20px;text-decoration:none;border-radius:4px;">
 Kunjungi Website
 </a>
 </div>
@@ -165,9 +163,11 @@ Kunjungi Website
 
 <!-- FOOTER -->
 <tr>
-<td align="center" bgcolor="#0f0f0f" style="padding:20px;color:#aaa;font-size:12px;">
+<td align="center" bgcolor="#102F76" style="padding:20px;color:#ffffff;font-size:12px;">
 Weavory Studio<br/>
+<span style="color:#477D7B;">
 Custom Apparel • Tailor • Sablon
+</span>
 </td>
 </tr>
 
