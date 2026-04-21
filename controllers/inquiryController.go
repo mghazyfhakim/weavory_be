@@ -115,7 +115,7 @@ Balas Sekarang
         <!-- HEADER -->
         <tr>
           <td style="background:#0f0f0f;padding:25px;text-align:center;">
-            <img src="LOGO_URL" alt="Weavory Studio" style="height:40px;margin-bottom:10px;">
+            <img src="https://res.cloudinary.com/dphlgt5hf/image/upload/v1776775942/Design_2-removebg-preview_np1r2i.png" alt="Weavory Studio" style="height:40px;margin-bottom:10px;">
             <p style="color:#c9a96e;font-size:12px;letter-spacing:2px;margin:0;">
               PREMIUM TAILOR & FASHION STUDIO
             </p>
